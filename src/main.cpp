@@ -1,5 +1,7 @@
 #include <Arduino.h>
 #include <Servo.h>
+#include <ArduPID.h>
+
 namespace {
     constexpr int kServoBasePin = 6;
     constexpr int kServoShoulderPin = 3;
@@ -42,10 +44,42 @@ void loop() {
     joy2YValue = analogRead(kJoy2YPin);
 
     const int mappedBase = static_cast<int>(map(joy1YValue, 0, 1023, 180, 0));
-    servo_base.write(mappedBase);
+    const int currentBase = static_cast<int>(servo_base.read());
+    if (abs(mappedBase - currentBase) > 10) {
+        int target = currentBase + (mappedBase < currentBase ? -10 : 10);
+        target = constrain(target, 0, 180);
+        servo_base.write(target);
+    } else {
+        servo_base.write(mappedBase);
+    }
+
     const int mappedElbow = static_cast<int>(map(joy1XValue, 0, 1023, 0, 180));
-    servo_elbow.write(mappedElbow);
+    const int currentElbow = static_cast<int>(servo_elbow.read());
+    if (abs(mappedElbow - currentElbow) > 10) {
+        int target = currentElbow + (mappedElbow < currentElbow ? -10 : 10);
+        target = constrain(target, 0, 180);
+        servo_elbow.write(target);
+    } else {
+        servo_elbow.write(mappedElbow);
+    }
+
     const int mappedShoulder = static_cast<int>(map(joy2XValue, 0, 1023, 0, 180));
-    servo_shoulder.write(mappedShoulder);
-// write your code here
+    const int currentShoulder = static_cast<int>(servo_shoulder.read());
+    if (abs(mappedShoulder - currentShoulder) > 10) {
+        int target = currentShoulder + (mappedShoulder < currentShoulder ? -10 : 10);
+        target = constrain(target, 0, 180);
+        servo_shoulder.write(target);
+    } else {
+        servo_shoulder.write(mappedShoulder);
+    }
+
+    const int mappedCraw = static_cast<int>(map(joy2YValue, 0, 1023, 0, 180));
+    const int currentCraw = static_cast<int>(servo_claw.read());
+    if (abs(mappedCraw - currentCraw) > 10) {
+        int target = currentCraw + (mappedCraw < currentCraw ? -10 : 10);
+        target = constrain(target, 0, 180);
+        servo_claw.write(target);
+    } else {
+        servo_claw.write(mappedShoulder);
+    }
 }
