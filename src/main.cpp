@@ -1,22 +1,35 @@
 #include <Arduino.h>
 #include <Servo.h>
 #include <ArduPID.h>
+#include <SerialRecord.h>
 
 namespace {
+    SerialRecord writer(3);
+
     constexpr int kServoBasePin = 6;
     constexpr int kServoShoulderPin = 3;
     constexpr int kServoElbowPin = 5;
-    constexpr int kServoClawPin = 9;
+    //constexpr int kServoClawPin = 9;
+
+    ArduPID controllerBase;
+    ArduPID controllerShoulder;
+    ArduPID controllerElbow;
+
+    double setPoint_Base;
+    double setPoint_Shoulder;
+    double setPoint_Elbow;
+
+    double output_Base;
+    double output_Shoulder;
+    double output_Elbow;
+
+    double input_Base;
+    double input_Shoulder;
+    double input_Elbow;
 
     Servo servo_base;
     Servo servo_shoulder;
     Servo servo_elbow;
-    Servo servo_claw;
-
-    int joy1XValue = 0;
-    int joy1YValue = 0;
-    int joy2XValue = 0;
-    int joy2YValue = 0;
 
     constexpr int kJoy1XPin = A0;
     constexpr int kJoy1YPin = A1;
@@ -25,61 +38,37 @@ namespace {
 }
 
 void setup() {
+    Serial.begin(9600);
+    writer.setFieldName(0, "input_Base");
+    writer.setFieldName(1, "setPoint_Base");
+    writer.setFieldName(2, "output_Base");
+
     servo_base.attach(kServoBasePin);
     servo_shoulder.attach(kServoShoulderPin);
     servo_elbow.attach(kServoElbowPin);
-    servo_claw.attach(kServoClawPin);
+    //servo_claw.attach(kServoClawPin);
 
-    servo_base.write(90);
-    servo_elbow.write(90);
-    servo_shoulder.write(90);
-    servo_claw.write(0);
+    controllerBase.begin(&input_Base, &output_Base, &setPoint_Base, 1, 0, 0);
+    controllerShoulder.begin(&input_Shoulder, &output_Shoulder, &setPoint_Shoulder, 1, 0, 0);
+    controllerElbow.begin(&input_Elbow, &output_Elbow, &setPoint_Elbow, 1, 0, 0);
+
+    controllerBase.setOutputLimits(0, 180);
+    controllerShoulder.setOutputLimits(0, 180);
+    controllerElbow.setOutputLimits(0, 180);
+
+    controllerBase.start();
+    controllerShoulder.start();
+    controllerElbow.start();
 }
 
 void loop() {
-    joy1XValue = analogRead(kJoy1XPin);
-    joy1YValue = analogRead(kJoy1YPin);
-
-    joy2XValue = analogRead(kJoy2XPin);
-    joy2YValue = analogRead(kJoy2YPin);
-
-    const int mappedBase = static_cast<int>(map(joy1YValue, 0, 1023, 180, 0));
-    const int currentBase = static_cast<int>(servo_base.read());
-    if (abs(mappedBase - currentBase) > 10) {
-        int target = currentBase + (mappedBase < currentBase ? -10 : 10);
-        target = constrain(target, 0, 180);
-        servo_base.write(target);
-    } else {
-        servo_base.write(mappedBase);
-    }
-
-    const int mappedElbow = static_cast<int>(map(joy1XValue, 0, 1023, 0, 180));
-    const int currentElbow = static_cast<int>(servo_elbow.read());
-    if (abs(mappedElbow - currentElbow) > 10) {
-        int target = currentElbow + (mappedElbow < currentElbow ? -10 : 10);
-        target = constrain(target, 0, 180);
-        servo_elbow.write(target);
-    } else {
-        servo_elbow.write(mappedElbow);
-    }
-
-    const int mappedShoulder = static_cast<int>(map(joy2XValue, 0, 1023, 0, 180));
-    const int currentShoulder = static_cast<int>(servo_shoulder.read());
-    if (abs(mappedShoulder - currentShoulder) > 10) {
-        int target = currentShoulder + (mappedShoulder < currentShoulder ? -10 : 10);
-        target = constrain(target, 0, 180);
-        servo_shoulder.write(target);
-    } else {
-        servo_shoulder.write(mappedShoulder);
-    }
-
-    const int mappedCraw = static_cast<int>(map(joy2YValue, 0, 1023, 0, 180));
-    const int currentCraw = static_cast<int>(servo_claw.read());
-    if (abs(mappedCraw - currentCraw) > 10) {
-        int target = currentCraw + (mappedCraw < currentCraw ? -10 : 10);
-        target = constrain(target, 0, 180);
-        servo_claw.write(target);
-    } else {
-        servo_claw.write(mappedShoulder);
-    }
+    input_Base = servo_base.read();
+    setPoint_Base = map(analogRead(kJoy1XPin), 0, 1023, 180, 0);
+    writer[0] = input_Base;
+    writer[1] = setPoint_Base;
+    writer[2] = output_Base;
+    writer.send();
+    controllerBase.compute();
+    servo_base.write(output_Base);
+    delay(100);
 }
